@@ -43,6 +43,15 @@ const Reactive = require("Reactive");
 
   const stateManager = {
     Start: {
+      onOneHandUp() {
+        if (
+          startSubstates.hasSeenBothHandsUp &&
+          startSubstates.hasSeenBothHandsDown
+        ) {
+          // We are still waiting for animateInWatermelon to finish, but the user has already lifted one hand. We need to process this signal now instead of waiting until CutWatermelon state, because otherwise, the user has to put the hand down, and up again in order to get the signal processed.
+          cutWatermelonSubstates.hasSeenOneHandUp = true;
+        }
+      },
       onBothHandsUp() {
         startSubstates.hasSeenBothHandsUp = true;
       },
@@ -54,10 +63,28 @@ const Reactive = require("Reactive");
           startSubstates.hasSeenBothHandsDown = true;
           Diagnostics.log("ANIMATION: animateInWatermelon");
           Patches.inputs.setPulse("animateInWatermelon", Reactive.once());
+        } else if (
+          startSubstates.hasSeenBothHandsUp &&
+          startSubstates.hasSeenBothHandsDown &&
+          cutWatermelonSubstates.hasSeenOneHandUp &&
+          !cutWatermelonSubstates.hasSeenBothHandsDown
+        ) {
+          // We are still waiting for animateInWatermelon to finish, but the user has already performed the cut gesture. We need to process this signal now instead of waiting until CutWatermelon state, because otherwise, the user has to put the hand down, and up again in order to get the signal processed.
+          cutWatermelonSubstates.hasSeenBothHandsDown = true;
         }
       },
       onWatermelonAnimatedIn() {
         setState(State.CutWatermelon);
+
+        if (
+          cutWatermelonSubstates.hasSeenOneHandUp &&
+          cutWatermelonSubstates.hasSeenBothHandsDown
+        ) {
+          // User hasn already finished the cut gesture before animateInWatermelon finishes. Play cutWatermelon animation immediately.
+          setState(State.CutWatermelon);
+          Diagnostics.log("ANIMATION: cutWatermelon");
+          Patches.inputs.setPulse("cutWatermelon", Reactive.once());
+        }
       },
     },
     CutWatermelon: {
@@ -115,7 +142,7 @@ const Reactive = require("Reactive");
           Diagnostics.log("ANIMATION: animateInTaijitu");
           Patches.inputs.setPulse("animateInTaijitu", Reactive.once());
         }
-      }
+      },
     },
   };
 
